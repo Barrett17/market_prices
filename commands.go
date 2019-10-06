@@ -4,6 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+
+	"github.com/gorilla/mux"
+
+	"./datagrabber"
+	"./types"
 )
 
 type responseErr struct {
@@ -16,7 +22,26 @@ func Index(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetTicker(w http.ResponseWriter, r *http.Request) {
-	
+	defer r.Body.Close()
+
+	tickerStr := mux.Vars(r)["ticker"]
+
+	ticker := types.INVALID_TICKER
+	if (strings.Compare(tickerStr, "USD") == 0) {
+		ticker = types.EUR_USD;
+	} else if (strings.Compare(tickerStr, "GBP") == 0) {
+		ticker = types.EUR_GBP;
+	} else {
+		replyError(http.StatusBadRequest, w, r, "Wrong ticker format")
+		return
+	}
+
+	data, err := datagrabber.GetData(ticker)
+	if (err != nil) {
+		replyError(http.StatusInternalServerError, w, r, "Server in trouble")
+	}
+
+	replyJSON(w, http.StatusOK, data)
 }
 
 func replyJSON(w http.ResponseWriter, status int, payload interface{}) {
@@ -36,7 +61,6 @@ func replyError(err int, w http.ResponseWriter, r *http.Request, text string) {
 }
 
 func replyOk(w http.ResponseWriter) {
-	w.Header().Set("Content-Type",
-		"application/json")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
