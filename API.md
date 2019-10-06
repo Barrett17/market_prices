@@ -1,26 +1,26 @@
-/api/ticker/{pair}
+/api/ticker/{ticker}
 [GET]
 
 Get price in euro for the pair selected. Currently available pairs:
 
-USD-EUR
-GBP-EUR
+USD
+GBP
 
 Returns (JSON):
 
-- ticker
+- ticker (string)
 
 The ticker used to make the request.
 
-- rate
+- rate (float)
 
 The current rate of the trading pair.
 
-- weekrate
+- weekrate (float)
 
 The last week average rate.
 
-- prediction
+- buy (bool)
 
-The prediction for the next week (buy/sell)
+The prediction for the next week (buy=true/sell=false)
 
