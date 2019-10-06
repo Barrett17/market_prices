@@ -20,7 +20,7 @@ var routes = []Route{
 
 	Route{
 		"GetTicker",
-		"POST",
+		"GET",
 		"/api/ticker/{pair}",
 		GetTicker,
 	},
