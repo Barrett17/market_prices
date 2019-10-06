@@ -9,17 +9,17 @@ import (
 	"time"
 )
 
-// Poll new data each 60 seconds
+// Poll new data each Quantum seconds
 const Quantum = 60
-const Timeout = Quantum
 const RemoteUrl = "https://api.exchangeratesapi.io/"
 
 var mutex = &sync.Mutex{}
-var lastRates = ExchangeLatestResponse{}
 
+var lastRates = ExchangeLatestResponse{}
 var lastWeekRateUSD = 0.0
 var lastWeekRateGBP = 0.0
 
+// TODO move types in types package
 type Rates struct {
 	USD float64 `json:"USD"`
 	GBP float64 `json:"GBP"`
@@ -58,6 +58,7 @@ func pollData() {
 		fmt.Println(err)
 	}
 
+	// TODO check if a day has passed
 	err = pollWeeklyRates();
 	if (err != nil) {
 		fmt.Println(err)
@@ -123,7 +124,7 @@ func pollWeeklyRates() error {
 	avgGBP := 0.0
 	for _, value := range response.Rates {
 		avgUSD += value.USD;
-		avgGBP += value.USD;
+		avgGBP += value.GBP;
 	}
 
 	avgUSD = avgUSD/float64(len(response.Rates))
