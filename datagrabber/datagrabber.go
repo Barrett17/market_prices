@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"../types"
 )
 
 // Poll new data each Quantum seconds
@@ -15,25 +17,9 @@ const RemoteUrl = "https://api.exchangeratesapi.io/"
 
 var mutex = &sync.Mutex{}
 
-var lastRates = ExchangeLatestResponse{}
+var lastRates = types.ExchangeLatestResponse{}
 var lastWeekRateUSD = 0.0
 var lastWeekRateGBP = 0.0
-
-// TODO move types in types package
-type Rates struct {
-	USD float64 `json:"USD"`
-	GBP float64 `json:"GBP"`
-}
-
-type ExchangeLatestResponse struct {
-	Rates Rates `json:"rates"`
-	Base string `json:"base"`
-	Date string `json:"date"`
-}
-
-type ExchangeHistoryResponse struct {
-	Rates map[string]Rates `json:"rates"`
-}
 
 func init() {
 	go func() {
@@ -82,7 +68,7 @@ func pollCurrentRates() error {
 		return errors.New("Wrong StatusCode from server")
 	}
 
-	response := ExchangeLatestResponse{}
+	response := types.ExchangeLatestResponse{}
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&response); err != nil {
@@ -113,7 +99,7 @@ func pollWeeklyRates() error {
 		return errors.New("Wrong StatusCode from server")
 	}
 
-	response := ExchangeHistoryResponse{}
+	response := types.ExchangeHistoryResponse{}
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&response); err != nil {
