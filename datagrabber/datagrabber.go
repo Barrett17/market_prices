@@ -142,7 +142,7 @@ func makeGetRequest(url string, data interface{}) error {
 	return nil
 }
 
-func GetData(ticker int) (types.HTTPResponse, error) {
+func GetData(ticker int) (*types.HTTPResponse, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -160,7 +160,7 @@ func GetData(ticker int) (types.HTTPResponse, error) {
 		ret.Rate = float32(lastRateGBP);
 		ret.WeekRate = float32(lastWeekRateGBP);
 	} else {
-		return types.HTTPResponse{}, errors.New("Wrong ticker")
+		return nil, errors.New("Wrong ticker")
 	}
 
 	if (ret.Rate >= ret.WeekRate) {
@@ -169,5 +169,5 @@ func GetData(ticker int) (types.HTTPResponse, error) {
 		ret.Prediction = true;
 	}
 
-	return ret, nil
+	return &ret, nil
 }

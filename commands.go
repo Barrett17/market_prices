@@ -42,7 +42,7 @@ func GetTicker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	replyJSON(w, http.StatusOK, data)
+	replyJSON(w, http.StatusOK, *data)
 }
 
 func replyJSON(w http.ResponseWriter, status int, payload interface{}) {
