@@ -20,6 +20,7 @@ var mutex = &sync.Mutex{}
 var lastRates = types.ExchangeLatestResponse{}
 var lastWeekRateUSD = 0.0
 var lastWeekRateGBP = 0.0
+var lastDay = time.Time{}
 
 func init() {
 	go func() {
@@ -44,10 +45,15 @@ func pollData() {
 		fmt.Println(err)
 	}
 
-	// TODO check if a day has passed
-	err = pollWeeklyRates();
-	if (err != nil) {
-		fmt.Println(err)
+	// Check that 24 hours have passed
+	now := time.Now()
+	days := now.Sub(lastDay).Hours() / 24
+	if (days > 1) {
+		lastDay = now
+		err = pollWeeklyRates();
+		if (err != nil) {
+			fmt.Println(err)
+		}
 	}
 }
 
@@ -77,15 +83,22 @@ func pollCurrentRates() error {
 
 	lastRates = response
 
-	s := fmt.Sprintf("%f %f", response.Rates.GBP, response.Rates.USD);
-	fmt.Println(s)
-
 	return nil
 }
 
 // Assumes the mutex is already locked when called
 func pollWeeklyRates() error {
-	req, _ := http.NewRequest("GET", RemoteUrl+"history?start_at=2018-01-01&end_at=2018-09-01&symbols=USD,GBP", nil)
+	dt := time.Now()
+	today := dt.Format("2006-01-02")
+
+	// Sat and Sun the market is down, keep in mind this
+	dt = dt.AddDate(0, 0, -7)
+	oneWeekAgo := dt.Format("2006-01-02")
+
+	url := RemoteUrl+"history?start_at=" + oneWeekAgo + "&end_at=" +
+		today + "&symbols=USD,GBP"
+
+	req, _ := http.NewRequest("GET", url, nil)
 
 	client := &http.Client{}
 	res, err := client.Do(req)
@@ -106,11 +119,15 @@ func pollWeeklyRates() error {
 		return errors.New("Cannot decode data")
 	}
 
+	if (len(response.Rates) < 5) {
+		return errors.New("Not enough data to process")
+	}
+
 	avgUSD := 0.0
 	avgGBP := 0.0
 	for _, value := range response.Rates {
-		avgUSD += value.USD;
-		avgGBP += value.GBP;
+		avgUSD += value.USD
+		avgGBP += value.GBP
 	}
 
 	avgUSD = avgUSD/float64(len(response.Rates))
@@ -118,14 +135,32 @@ func pollWeeklyRates() error {
 	avgGBP = avgGBP/float64(len(response.Rates))
 	lastWeekRateGBP = avgGBP
 
-	s := fmt.Sprintf("%f", lastWeekRateUSD);
-	fmt.Println(s)
-
 	return nil
 }
 
-func GetData() {
+func GetData(ticker int) (types.HTTPResponse, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	
+
+	var ret types.HTTPResponse
+
+	if (ticker == types.EUR_USD) {
+		ret.Ticker = "USD";
+		ret.Rate = lastRates.Rates.USD;
+		ret.WeekRate = lastWeekRateUSD;
+	} else if (ticker == types.EUR_GBP) {
+		ret.Ticker = "GBP";
+		ret.Rate = lastRates.Rates.GBP;
+		ret.WeekRate = lastWeekRateGBP;
+	} else {
+		return types.HTTPResponse{}, errors.New("Wrong ticker")
+	}
+
+	if (ret.Rate >= ret.WeekRate) {
+		ret.Prediction = false;
+	} else {
+		ret.Prediction = true;
+	}
+
+	return ret, nil
 }
