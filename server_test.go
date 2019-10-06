@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"./types"
 )
 
 var url = "http://127.0.0.1:8080/api/ticker/"
 
 func TestMain(t *testing.T) {
-	req, _ := http.NewRequest("GET", url+"USD-EUR", nil)
+	req, _ := http.NewRequest("GET", url+"USD", nil)
 
 	client := &http.Client{}
 	res, err := client.Do(req)
@@ -24,14 +26,14 @@ func TestMain(t *testing.T) {
 		t.Errorf("Cannot GET data!")
 	}
 
-	response := Response{}
+	response := types.HTTPResponse{}
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&response); err != nil {
 		t.Errorf("Cannot decode data!")
 	}
 
-	if strings.Compare(response.Ticker, "USD-EUR") != 0 {
+	if strings.Compare(response.Ticker, "USD") != 0 {
 		t.Errorf("Response has wrong ticker!")
 	}
 }

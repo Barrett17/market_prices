@@ -27,18 +27,19 @@ func GetTicker(w http.ResponseWriter, r *http.Request) {
 	tickerStr := mux.Vars(r)["ticker"]
 
 	ticker := types.INVALID_TICKER
-	if (strings.Compare(tickerStr, "USD") == 0) {
-		ticker = types.EUR_USD;
-	} else if (strings.Compare(tickerStr, "GBP") == 0) {
-		ticker = types.EUR_GBP;
+	if strings.Compare(tickerStr, "USD") == 0 {
+		ticker = types.EUR_USD
+	} else if strings.Compare(tickerStr, "GBP") == 0 {
+		ticker = types.EUR_GBP
 	} else {
 		replyError(http.StatusBadRequest, w, r, "Wrong ticker format")
 		return
 	}
 
 	data, err := datagrabber.GetData(ticker)
-	if (err != nil) {
+	if err != nil {
 		replyError(http.StatusInternalServerError, w, r, "Server in trouble")
+		return
 	}
 
 	replyJSON(w, http.StatusOK, data)

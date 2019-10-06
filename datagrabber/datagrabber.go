@@ -17,7 +17,8 @@ const RemoteUrl = "https://api.exchangeratesapi.io/"
 
 var mutex = &sync.Mutex{}
 
-var lastRates = types.ExchangeLatestResponse{}
+var lastRateUSD = 0.0
+var lastRateGBP = 0.0
 var lastWeekRateUSD = 0.0
 var lastWeekRateGBP = 0.0
 var lastDay = time.Time{}
@@ -40,54 +41,70 @@ func pollData() {
 
 	fmt.Println("Polling data");
 
-	err := pollCurrentRates();
+	rate, err := pollCurrentRates("USD");
 	if (err != nil) {
 		fmt.Println(err)
 	}
+	lastRateUSD = rate
 
-	// Check that 24 hours have passed
+	rate, err = pollCurrentRates("GBP");
+	if (err != nil) {
+		fmt.Println(err)
+	}
+	lastRateGBP = rate
+
+	// Check that at least 24 hours have passed
 	now := time.Now()
 	days := now.Sub(lastDay).Hours() / 24
-	if (days > 1) {
+	if (days >= 1) {
+		// Cool, it's another day, let's see what happened
+		// last week.
 		lastDay = now
-		err = pollWeeklyRates();
+
+		rate, err = pollWeeklyRates("USD");
 		if (err != nil) {
 			fmt.Println(err)
 		}
+		lastWeekRateUSD = rate
+
+		rate, err = pollWeeklyRates("GBP");
+		if (err != nil) {
+			fmt.Println(err)
+		}
+		lastWeekRateGBP = rate
 	}
 }
 
-// Assumes the mutex is already locked when called
-func pollCurrentRates() error {
-	req, _ := http.NewRequest("GET", RemoteUrl+"latest?symbols=USD,GBP", nil)
+// Assume the mutex is already locked when called
+func pollCurrentRates(base string) (float64, error) {
+	req, _ := http.NewRequest("GET", RemoteUrl +
+		"latest?symbols=EUR&base=" + base, nil)
 
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
 		// TODO define errors
-		return errors.New("Wrong StatusCode from server")
+		return 0, errors.New("Wrong StatusCode from server")
 	}
 
 	response := types.ExchangeLatestResponse{}
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&response); err != nil {
-		return errors.New("Cannot decode data")
+		return 0, errors.New("Cannot decode data")
 	}
 
-	lastRates = response
-
-	return nil
+	return response.Rates["EUR"], nil
 }
 
-// Assumes the mutex is already locked when called
-func pollWeeklyRates() error {
+// Assume the mutex is already locked when called
+func pollWeeklyRates(base string) (float64, error) {
 	dt := time.Now()
 	today := dt.Format("2006-01-02")
 
@@ -96,64 +113,60 @@ func pollWeeklyRates() error {
 	oneWeekAgo := dt.Format("2006-01-02")
 
 	url := RemoteUrl+"history?start_at=" + oneWeekAgo + "&end_at=" +
-		today + "&symbols=USD,GBP"
+		today + "&symbols=EUR&base=" + base
 
 	req, _ := http.NewRequest("GET", url, nil)
 
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return errors.New("Wrong StatusCode from server")
+		return 0, errors.New("Wrong StatusCode from server")
 	}
 
 	response := types.ExchangeHistoryResponse{}
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&response); err != nil {
-		return errors.New("Cannot decode data")
+		return 0, errors.New("Cannot decode data")
 	}
 
 	if (len(response.Rates) < 5) {
-		return errors.New("Not enough data to process")
+		return 0, errors.New("Not enough data to process")
 	}
 
-	avgUSD := 0.0
-	avgGBP := 0.0
+	avg := 0.0
 	for _, value := range response.Rates {
-		avgUSD += value.USD
-		avgGBP += value.GBP
+			avg += value["EUR"]
 	}
 
-	avgUSD = avgUSD/float64(len(response.Rates))
-	lastWeekRateUSD = avgUSD
-	avgGBP = avgGBP/float64(len(response.Rates))
-	lastWeekRateGBP = avgGBP
-
-	return nil
+	return avg/float64(len(response.Rates)), nil
 }
 
 func GetData(ticker int) (types.HTTPResponse, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	var ret types.HTTPResponse
+	ret := types.HTTPResponse{}
 
 	if (ticker == types.EUR_USD) {
 		ret.Ticker = "USD";
-		ret.Rate = lastRates.Rates.USD;
-		ret.WeekRate = lastWeekRateUSD;
+		// Round to float32 so that we round the number.
+		// It is useful to do calculations using float64
+		// So that we have always higher precision
+		ret.Rate = float32(lastRateUSD);
+		ret.WeekRate = float32(lastWeekRateUSD);
 	} else if (ticker == types.EUR_GBP) {
 		ret.Ticker = "GBP";
-		ret.Rate = lastRates.Rates.GBP;
-		ret.WeekRate = lastWeekRateGBP;
+		ret.Rate = float32(lastRateGBP);
+		ret.WeekRate = float32(lastWeekRateGBP);
 	} else {
-		return types.HTTPResponse{}, errors.New("Wrong ticker")
+		return ret, errors.New("Wrong ticker")
 	}
 
 	if (ret.Rate >= ret.WeekRate) {
