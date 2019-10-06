@@ -16,7 +16,9 @@ const RemoteUrl = "https://api.exchangeratesapi.io/"
 
 var mutex = &sync.Mutex{}
 var lastRates = ExchangeLatestResponse{}
-var lastWeekRate float64
+
+var lastWeekRateUSD = 0.0
+var lastWeekRateGBP = 0.0
 
 type Rates struct {
 	USD float64 `json:"USD"`
@@ -117,9 +119,20 @@ func pollWeeklyRates() error {
 		return errors.New("Cannot decode data")
 	}
 
-	//lastWeekRates = response
+	avgUSD := 0.0
+	avgGBP := 0.0
+	for _, value := range response.Rates {
+		avgUSD += value.USD;
+		avgGBP += value.USD;
+	}
 
-	//fmt.Println(response.Rates)
+	avgUSD = avgUSD/float64(len(response.Rates))
+	lastWeekRateUSD = avgUSD
+	avgGBP = avgGBP/float64(len(response.Rates))
+	lastWeekRateGBP = avgGBP
+
+	s := fmt.Sprintf("%f", lastWeekRateUSD);
+	fmt.Println(s)
 
 	return nil
 }
@@ -127,6 +140,5 @@ func pollWeeklyRates() error {
 func GetData() {
 	mutex.Lock()
 	defer mutex.Unlock()
-
 	
 }
