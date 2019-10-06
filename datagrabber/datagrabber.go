@@ -77,27 +77,12 @@ func pollData() {
 
 // Assume the mutex is already locked when called
 func pollCurrentRates(base string) (float64, error) {
-	req, _ := http.NewRequest("GET", RemoteUrl +
-		"latest?symbols=EUR&base=" + base, nil)
-
-	client := &http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		return 0, err
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		// TODO define errors
-		return 0, errors.New("Wrong StatusCode from server")
-	}
-
+	url := RemoteUrl + "latest?symbols=EUR&base=" + base
 	response := types.ExchangeLatestResponse{}
 
-	decoder := json.NewDecoder(res.Body)
-	if err := decoder.Decode(&response); err != nil {
-		return 0, errors.New("Cannot decode data")
+	err := makeGetRequest(url, &response)
+	if (err != nil) {
+		return 0, err
 	}
 
 	return response.Rates["EUR"], nil
@@ -115,25 +100,11 @@ func pollWeeklyRates(base string) (float64, error) {
 	url := RemoteUrl+"history?start_at=" + oneWeekAgo + "&end_at=" +
 		today + "&symbols=EUR&base=" + base
 
-	req, _ := http.NewRequest("GET", url, nil)
-
-	client := &http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		return 0, err
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return 0, errors.New("Wrong StatusCode from server")
-	}
-
 	response := types.ExchangeHistoryResponse{}
 
-	decoder := json.NewDecoder(res.Body)
-	if err := decoder.Decode(&response); err != nil {
-		return 0, errors.New("Cannot decode data")
+	err := makeGetRequest(url, &response)
+	if (err != nil) {
+		return 0, err
 	}
 
 	if (len(response.Rates) < 5) {
@@ -148,6 +119,29 @@ func pollWeeklyRates(base string) (float64, error) {
 	return avg/float64(len(response.Rates)), nil
 }
 
+func makeGetRequest(url string, data interface{}) error {
+	req, _ := http.NewRequest("GET", url, nil)
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		// TODO define errors
+		return errors.New("Wrong StatusCode from server")
+	}
+
+	decoder := json.NewDecoder(res.Body)
+	if err := decoder.Decode(data); err != nil {
+		return errors.New("Cannot decode data")
+	}
+	return nil
+}
+
 func GetData(ticker int) (types.HTTPResponse, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -158,7 +152,7 @@ func GetData(ticker int) (types.HTTPResponse, error) {
 		ret.Ticker = "USD";
 		// Round to float32 so that we round the number.
 		// It is useful to do calculations using float64
-		// So that we have always higher precision
+		// so that we have always higher precision.
 		ret.Rate = float32(lastRateUSD);
 		ret.WeekRate = float32(lastWeekRateUSD);
 	} else if (ticker == types.EUR_GBP) {
@@ -166,7 +160,7 @@ func GetData(ticker int) (types.HTTPResponse, error) {
 		ret.Rate = float32(lastRateGBP);
 		ret.WeekRate = float32(lastWeekRateGBP);
 	} else {
-		return ret, errors.New("Wrong ticker")
+		return types.HTTPResponse{}, errors.New("Wrong ticker")
 	}
 
 	if (ret.Rate >= ret.WeekRate) {
