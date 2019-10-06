@@ -12,9 +12,9 @@ type responseErr struct {
 }
 
 type Response struct {
-	Ticker string `json:"ticker"`
-	Rate  string `json:"rate"`
-	WeekRate  string `json:"weekrate"`
+	Ticker     string `json:"ticker"`
+	Rate       string `json:"rate"`
+	WeekRate   string `json:"weekrate"`
 	Prediction string `json:"prediction"`
 }
 

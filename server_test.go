@@ -31,7 +31,7 @@ func TestMain(t *testing.T) {
 		t.Errorf("Cannot decode data!")
 	}
 
-	if (strings.Compare(response.Ticker, "USD-EUR") != 0) {
-		t.Errorf("Response has wrong ticker!")		
-	} 
+	if strings.Compare(response.Ticker, "USD-EUR") != 0 {
+		t.Errorf("Response has wrong ticker!")
+	}
 }
