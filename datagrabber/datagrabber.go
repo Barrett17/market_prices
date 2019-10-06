@@ -11,17 +11,18 @@ import (
 	"../types"
 )
 
+var mutex = &sync.RWMutex{}
+
 // Poll new data each Quantum seconds
 const Quantum = 60
 const RemoteUrl = "https://api.exchangeratesapi.io/"
-
-var mutex = &sync.Mutex{}
 
 var lastRateUSD = 0.0
 var lastRateGBP = 0.0
 var lastWeekRateUSD = 0.0
 var lastWeekRateGBP = 0.0
-var lastDay = time.Time{}
+var lastPredictionGBP = false
+var lastPredictionUSD = false
 
 func init() {
 	go func() {
@@ -33,6 +34,49 @@ func init() {
 			<-ticker.C
 		}
 	}()
+
+	go func() {
+		ticker := time.NewTicker(time.Hour * 24)
+		defer ticker.Stop()
+
+		for {
+			pollWeeklyData();
+			<-ticker.C
+		}
+	}()
+}
+
+func pollWeeklyData() {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	// Cool, it's another day, let's see what happened
+	// last week.
+
+	c1 := make(chan float64, 1)
+	c2 := make(chan float64, 1)
+
+	go func() {
+		err := pollWeeklyRates("USD", c1);
+		if (err != nil) {
+			fmt.Println(err)
+		}
+	}()
+
+	go func() {
+		err := pollWeeklyRates("GBP", c2);
+		if (err != nil) {
+			fmt.Println(err)
+		}
+	}()
+
+	lastWeekRateUSD = <-c1
+	lastWeekRateGBP = <-c2
+
+	go func() {
+		close(c1)
+		close(c2)
+	}()
 }
 
 func pollData() {
@@ -41,55 +85,60 @@ func pollData() {
 
 	fmt.Println("Polling data");
 
-	rate, err := pollCurrentRates("USD");
-	if (err != nil) {
-		fmt.Println(err)
-	}
-	lastRateUSD = rate
+	c1 := make(chan float64, 1)
+	c2 := make(chan float64, 1)
 
-	rate, err = pollCurrentRates("GBP");
-	if (err != nil) {
-		fmt.Println(err)
-	}
-	lastRateGBP = rate
-
-	// Check that at least 24 hours have passed
-	now := time.Now()
-	days := now.Sub(lastDay).Hours() / 24
-	if (days >= 1) {
-		// Cool, it's another day, let's see what happened
-		// last week.
-		lastDay = now
-
-		rate, err = pollWeeklyRates("USD");
+	go func() {
+		err := pollCurrentRates("USD", c1);
 		if (err != nil) {
 			fmt.Println(err)
 		}
-		lastWeekRateUSD = rate
+	}()
 
-		rate, err = pollWeeklyRates("GBP");
+	go func() {
+		err := pollCurrentRates("GBP", c2);
 		if (err != nil) {
 			fmt.Println(err)
 		}
-		lastWeekRateGBP = rate
+	}()
+
+	lastRateUSD = <-c1
+	lastRateGBP = <-c2
+
+	go func() {
+		close(c1)
+		close(c2)
+	}()
+
+	if (lastRateUSD >= lastWeekRateUSD) {
+		lastPredictionUSD = false;
+	} else {
+		lastPredictionUSD = true;
+	}
+
+	if (lastRateGBP >= lastWeekRateGBP) {
+		lastPredictionGBP = false;
+	} else {
+		lastPredictionGBP = true;
 	}
 }
 
 // Assume the mutex is already locked when called
-func pollCurrentRates(base string) (float64, error) {
+func pollCurrentRates(base string, out chan<- float64) error {
 	url := RemoteUrl + "latest?symbols=EUR&base=" + base
 	response := types.ExchangeLatestResponse{}
 
 	err := makeGetRequest(url, &response)
 	if (err != nil) {
-		return 0, err
+		return err
 	}
 
-	return response.Rates["EUR"], nil
+	out <- response.Rates["EUR"]
+	return nil
 }
 
 // Assume the mutex is already locked when called
-func pollWeeklyRates(base string) (float64, error) {
+func pollWeeklyRates(base string, out chan<- float64) error {
 	dt := time.Now()
 	today := dt.Format("2006-01-02")
 
@@ -104,19 +153,21 @@ func pollWeeklyRates(base string) (float64, error) {
 
 	err := makeGetRequest(url, &response)
 	if (err != nil) {
-		return 0, err
+		return err
 	}
 
 	if (len(response.Rates) < 5) {
-		return 0, errors.New("Not enough data to process")
+		return errors.New("Not enough data to process")
 	}
 
 	avg := 0.0
 	for _, value := range response.Rates {
-			avg += value["EUR"]
+		avg += value["EUR"]
 	}
 
-	return avg/float64(len(response.Rates)), nil
+	out <- avg/float64(len(response.Rates))
+
+	return nil
 }
 
 func makeGetRequest(url string, data interface{}) error {
@@ -131,7 +182,6 @@ func makeGetRequest(url string, data interface{}) error {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		// TODO define errors
 		return errors.New("Wrong StatusCode from server")
 	}
 
@@ -143,30 +193,26 @@ func makeGetRequest(url string, data interface{}) error {
 }
 
 func GetData(ticker int) (*types.HTTPResponse, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
+	mutex.RLock()
+	defer mutex.RUnlock()
 
 	ret := types.HTTPResponse{}
 
 	if (ticker == types.EUR_USD) {
-		ret.Ticker = "USD";
+		ret.Ticker = "USD"
 		// Round to float32 so that we round the number.
 		// It is useful to do calculations using float64
 		// so that we have always higher precision.
-		ret.Rate = float32(lastRateUSD);
-		ret.WeekRate = float32(lastWeekRateUSD);
+		ret.Rate = float32(lastRateUSD)
+		ret.WeekRate = float32(lastWeekRateUSD)
+		ret.Prediction = lastPredictionUSD
 	} else if (ticker == types.EUR_GBP) {
-		ret.Ticker = "GBP";
-		ret.Rate = float32(lastRateGBP);
-		ret.WeekRate = float32(lastWeekRateGBP);
+		ret.Ticker = "GBP"
+		ret.Rate = float32(lastRateGBP)
+		ret.WeekRate = float32(lastWeekRateGBP)
+		ret.Prediction = lastPredictionGBP
 	} else {
 		return nil, errors.New("Wrong ticker")
-	}
-
-	if (ret.Rate >= ret.WeekRate) {
-		ret.Prediction = false;
-	} else {
-		ret.Prediction = true;
 	}
 
 	return &ret, nil

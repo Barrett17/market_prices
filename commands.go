@@ -60,8 +60,3 @@ func replyJSON(w http.ResponseWriter, status int, payload interface{}) {
 func replyError(err int, w http.ResponseWriter, r *http.Request, text string) {
 	replyJSON(w, err, map[string]string{"error": text})
 }
-
-func replyOk(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-}
