@@ -12,10 +12,10 @@ type responseErr struct {
 }
 
 type Response struct {
-	Ticker     string `json:"ticker"`
-	Rate       string `json:"rate"`
-	WeekRate   string `json:"weekrate"`
-	Prediction string `json:"prediction"`
+	Ticker     string  `json:"ticker"`
+	Rate       float64 `json:"rate"`
+	WeekRate   float64 `json:"weeklyrate"`
+	Prediction bool    `json:"prediction"`
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
