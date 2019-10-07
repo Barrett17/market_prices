@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"../types"
+	"github.com/Barrett17/market_prices/types"
 )
 
 var mutex = &sync.RWMutex{}

@@ -8,8 +8,8 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"./datagrabber"
-	"./types"
+	"github.com/Barrett17/market_prices/datagrabber"
+	"github.com/Barrett17/market_prices/types"
 )
 
 type responseErr struct {
