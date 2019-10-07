@@ -77,6 +77,8 @@ func pollWeeklyData() {
 		close(c1)
 		close(c2)
 	}()
+
+	makePrediction()
 }
 
 func pollData() {
@@ -110,17 +112,12 @@ func pollData() {
 		close(c2)
 	}()
 
-	if (lastRateUSD >= lastWeekRateUSD) {
-		lastPredictionUSD = false;
-	} else {
-		lastPredictionUSD = true;
-	}
+	makePrediction()
+}
 
-	if (lastRateGBP >= lastWeekRateGBP) {
-		lastPredictionGBP = false;
-	} else {
-		lastPredictionGBP = true;
-	}
+func makePrediction() {
+	lastPredictionUSD = lastRateUSD < lastWeekRateUSD
+	lastPredictionGBP = lastRateGBP < lastWeekRateGBP
 }
 
 // Assume the mutex is already locked when called
