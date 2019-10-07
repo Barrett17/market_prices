@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"./types"
+	"github.com/Barrett17/market_prices/types"
 )
 
 var url = "http://127.0.0.1:8080/api/ticker/"
